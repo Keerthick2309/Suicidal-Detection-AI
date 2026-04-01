@@ -3,6 +3,7 @@ nltk
 scikit-learn
 seaborn
 matplotlib
+tensorflow
 transformers
 torch
 streamlit
