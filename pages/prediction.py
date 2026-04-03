@@ -2,7 +2,7 @@ import streamlit as st
 import torch
 import joblib
 import tensorflow as tf
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import BertTokenizer, BertForSequenceClassification, pipeline
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from transformers import pipeline
 from lime.lime_text import LimeTextExplainer
@@ -26,9 +26,11 @@ def load_model():
     bert_tokenizer = BertTokenizer.from_pretrained("models/bert_model")
     explainer = LimeTextExplainer(class_names=["Non-Suicidal", "Suicidal"])
 
-    return lr_model, nb_model, svm_model, tfidf, lstm_model, bilstm_model, cnn_model, tokenizer, bert_model, bert_tokenizer, explainer
+    llm = pipeline("text-generation", model="google/flan-t5-large")
 
-lr_model, nb_model, svm_model, tfidf, lstm_model, bilstm_model, cnn_model, tokenizer, bert_model, bert_tokenizer, explainer = load_model()
+    return lr_model, nb_model, svm_model, tfidf, lstm_model, bilstm_model, cnn_model, tokenizer, bert_model, bert_tokenizer, explainer, llm
+
+lr_model, nb_model, svm_model, tfidf, lstm_model, bilstm_model, cnn_model, tokenizer, bert_model, bert_tokenizer, explainer, llm = load_model()
 
 def prediction(text, model_name):
     if model_name == "Logistic Regression":
@@ -94,15 +96,26 @@ if st.button("Predict"):
         st.warning("Enter Text")
     else:
         result = prediction(text, model_choice)
-        st.success(f"{model_choice} Prediction: {result}")
+        if result == "Non-Suicidal":
+            st.success(f"{model_choice} Prediction: {result}")
+        else:
+            st.error(f"{model_choice} Prediction: {result}")
+
+        response = llm(
+            f"""
+            Instruction: Explain why the following text indicates suicidal ideation.
+
+            Text: {text}
+
+            Explanation:
+            """,
+            max_new_tokens=100,
+            do_sample=True,
+            temperature=0.7
+        )
+
+        st.write(response[0]['generated_text'])
         if model_choice == "BERT":
-            st.subheader("Explanation (Important Words)")
-
             exp = explain_text(text)
-
-            # List view
-            st.write(exp.as_list())
-
-            # 🔥 Beautiful HTML highlight
             st.subheader("Visual Explanation")
             st.components.v1.html(exp.as_html(), height=400)
